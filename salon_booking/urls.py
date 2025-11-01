@@ -21,10 +21,10 @@ from django.conf import settings
 admin.site.site_title = admin.site.site_header = "Salon Booking Administration"
     
 urlpatterns = [
-    path('', include('polls.urls')),
+    path("", include("booking.urls")),
     path('admin/', admin.site.urls),
-    path("booking/", include("booking.urls")),
     path("reports/", include("reports.urls")),
+    # path("gcalendar_sync/", include("gcalendar_sync.urls")),
 ]
 
 if not settings.TESTING:

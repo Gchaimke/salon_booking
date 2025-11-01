@@ -2,3 +2,12 @@
 /polls
 /venv
 gcalendar_sync/secrets/*
+gcalendar_sync/__pycache__/
+booking/__pycache__/
+reports/__pycache__/
+salon_booking/__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+*.log
+salon_booking/__pycache__/settings.cpython-310.pyc

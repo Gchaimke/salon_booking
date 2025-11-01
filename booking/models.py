@@ -53,3 +53,7 @@ class BookingSettings(models.Model):
     period_of_each_booking = models.CharField(max_length=3, default="30", choices=BOOKING_PERIOD, help_text="How long each booking take.")
     pause_between_bookings = models.CharField(max_length=3, default="0", choices=BOOKING_PERIOD, help_text="How long to wait between bookings.")
     max_booking_per_time = models.IntegerField(default=1, help_text="how much booking can be book for each time.")
+
+    class Meta:
+        verbose_name = "Booking Settings"
+        verbose_name_plural = "Booking Settings"
