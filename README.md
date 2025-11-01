@@ -11,11 +11,20 @@ This project based on Django framework
 ## Installation
 ```
 git clone https://github.com/Gchaimke/salon_booking.git
+```
+```
 cd folder
+```
 python -m venv venv
+```
+```
 .\venv\Scripts\activate.bat
+```
 # OR
+```
 call venv/Scripts/activate
+```
+```
 pip install -r requirements.txt
 ```
 
