@@ -94,22 +94,52 @@ class GoogleCalendarAuth:
             logger.error(f"Failed to save credentials: {e}")
 
 
-def get_events():
+def get_events(calendar_id='primary'):
     auth = GoogleCalendarAuth()
     service = build('calendar', 'v3', credentials=auth.get_credentials())
 
     now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
-    print('Getting the upcoming 10 events')
-    events_result = service.events().list(calendarId='primary', timeMin=now,
+    logger.info('Getting the upcoming 10 events')
+    events_result = service.events().list(calendarId=calendar_id, timeMin=now,
                                         maxResults=10, singleEvents=True,
                                         orderBy='startTime').execute()
     events = events_result.get('items', [])
 
     if not events:
-        print('No upcoming events found.')
+        logger.info('No upcoming events found.')
     for event in events:
         start = event['start'].get('dateTime', event['start'].get('date'))
-        print(f"{start} - {event['summary']}")
+        logger.info(f"{start} - {event['summary']}")
+
+def add_event(calendar_id='primary', summary='New Event', start_time=None, end_time=None):
+    if start_time is None or end_time is None:
+        raise ValueError("start_time and end_time must be provided")
+    
+    auth = GoogleCalendarAuth()
+    service = build('calendar', 'v3', credentials=auth.get_credentials())
+
+    event = {
+        'summary': summary,
+        'start': {
+            'dateTime': start_time.isoformat(),
+            'timeZone': 'UTC',
+        },
+        'end': {
+            'dateTime': end_time.isoformat(),
+            'timeZone': 'UTC',
+        },
+    }
+
+    service.events().insert(calendarId=calendar_id, body=event).execute()
+    logger.info(f"Event added: {summary}")
+
 
 if __name__ == '__main__':
     get_events()
+    add_event(
+        summary='Test Event',
+        start_time=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1),
+        end_time=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)
+    )
+    get_events()
+    
