@@ -10,8 +10,3 @@ class GCalendarSyncSettingsView(TemplateView):
         # Logic to retrieve and display current settings
         context = {}
         return context
-
-    def post(self, request, *args, **kwargs):
-        # Logic to update settings based on user input
-        context = {}
-        return render(request, self.template_name, context)

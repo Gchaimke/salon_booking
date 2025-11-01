@@ -119,7 +119,11 @@ class BookingCreateWizardView(SessionWizardView):
         context = self.get_context_data(form=form, **kwargs)
 
         if not context["booking_settings"].booking_enable:
-            return redirect(BOOKING_DISABLE_URL)
+            return render(self.request, 'booking/user/booking_disabled.html', {
+            "description": 'Currently, bookings are disabled. Please try again later.',
+            "title": 'Booking Disabled',
+            "booking_bg": BOOKING_BG,
+        })
 
         return self.render_to_response(context)
 
