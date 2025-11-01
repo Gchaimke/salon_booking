@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from booking.forms import (BookingCustomerForm, BookingDateForm,
                            BookingSettingsForm, BookingTimeForm)
 from booking.models import Booking, BookingSettings
-from booking.settings import (BOOKING_BG, BOOKING_DESC, BOOKING_DISABLE_URL,
+from booking.settings import (BOOKING_BG, BOOKING_DESC,
                               BOOKING_SUCCESS_REDIRECT_URL, BOOKING_TITLE,
                               BOOKING_PAGINATION)
 from booking.utils import BookingSettingMixin
