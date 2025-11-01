@@ -1,6 +1,10 @@
 from django.db import models
 
-from booking.models import Booking
+try:
+    # Import Booking model if available
+    from booking.models import Booking
+except ImportError:
+    Booking = None
 
 
 class GCalendarSyncSettings(models.Model):
@@ -40,12 +44,13 @@ class GCalendarReminder(models.Model):
 
 class GCalendarEvent(models.Model):
     """Model to store Google Calendar event details."""
+    if Booking:
+        booking = models.ForeignKey(
+            Booking, blank=True, null=True, on_delete=models.CASCADE, related_name='gcalendar_events',
+            help_text="The booking this event is associated with.")
     sync_settings = models.ForeignKey(
         'GCalendarSyncSettings', on_delete=models.CASCADE, related_name='events',
         help_text="The Google Calendar sync settings this event is associated with.")
-    booking = models.ForeignKey(
-        Booking, blank=True, null=True, on_delete=models.CASCADE, related_name='gcalendar_events',
-        help_text="The booking this event is associated with.")
     event_id = models.CharField(
         max_length=255, unique=True, help_text="Unique ID of the Google Calendar event.")
     summary = models.CharField(

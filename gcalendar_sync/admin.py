@@ -1,8 +1,16 @@
 import datetime
-from time import timezone
+import logging
 from django.contrib import admin
+if 'Booking' in globals():
+    from booking.models import Booking
+from gcalendar_sync.utils import get_events
 
 from .models import GCalendarReminder, GCalendarSyncSettings, GCalendarEvent
+import re
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class GCalendarReminderInline(admin.TabularInline):
@@ -28,15 +36,37 @@ class GCalendarSyncSettingsAdmin(admin.ModelAdmin):
                 item.last_synced = datetime.datetime.now(datetime.timezone.utc)
                 item.save()
                 synced += 1
-        self.message_user(request, f'{synced} calendar(s) synchronization triggered. {item.calendar_id}')
+                calendar_events = get_events(calendar_id=item.calendar_id)
+                for event in calendar_events:
+                    # Extract booking ID from description using regex
+                    description = event.get('description', '')
+                    booking_id = None
+                    if 'Booking' in globals() and Booking:
+                        if 'Booking ID: ' in description:
+                            match = re.search(
+                                r'Booking ID: (\d+)', description)
+                            booking_id = int(match.group(1)) if match else None
+                    GCalendarEvent.objects.update_or_create(
+                        event_id=event.get('id'),
+                        sync_settings=item,
+                        defaults={
+                            'summary': event.get('summary', ''),
+                            'description': event.get('description', ''),
+                            'start_time': event['start'].get('dateTime') or event['start'].get('date'),
+                            'end_time': event['end'].get('dateTime') or event['end'].get('date'),
+                            'booking': int(booking_id) if booking_id else None,
+                        }
+                    )
+        self.message_user(
+            request, f'{synced} calendar(s) synchronization triggered. ID: {item.calendar_id}. Got {len(calendar_events)} event(s).')
     sync_now.short_description = "Sync selected calendars now"
-    
+
 
 @admin.register(GCalendarEvent)
 class GCalendarEventAdmin(admin.ModelAdmin):
-    list_display = ("summary", "event_id", "start_time", "end_time", "sync_settings", "booking",)
+    list_display = ("summary", "event_id", "start_time",
+                    "end_time", "sync_settings", "booking",)
     search_fields = ("summary", "event_id",)
     list_filter = ("sync_settings",)
     ordering = ("-start_time",)
     readonly_fields = ("created_at", "updated_at",)
-    

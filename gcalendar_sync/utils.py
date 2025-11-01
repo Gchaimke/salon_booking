@@ -121,7 +121,7 @@ class GoogleCalendarAuth:
             logger.error(f"Failed to save credentials: {e}")
 
 
-def get_events(calendar_id='primary'):
+def get_events(calendar_id='primary', query=None):
     auth = GoogleCalendarAuth()
     service = build('calendar', 'v3', credentials=auth.get_credentials())
 
@@ -129,7 +129,7 @@ def get_events(calendar_id='primary'):
         datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
     logger.info('Getting the upcoming 500 events with Salon Booking System tag')
     events_result = service.events().list(
-        calendarId=calendar_id, timeMin=now, maxResults=500, singleEvents=True, orderBy='startTime', q='Salon Booking System').execute()
+        calendarId=calendar_id, timeMin=now, maxResults=500, singleEvents=True, orderBy='startTime', q=query or 'Salon Booking System').execute()
     events = events_result.get('items', [])
 
     if not events:
@@ -139,6 +139,7 @@ def get_events(calendar_id='primary'):
         end = event['end'].get('dateTime', event['end'].get('date'))
         logger.info(
             f"{event['id']=} {start} - {end} : {event.get('summary', 'No Title')}")
+    return events
 
 
 def add_event(calendar_id='primary', summary='New Event', description=None, start_time=None, end_time=None):
@@ -146,10 +147,23 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
         raise ValueError("start_time and end_time must be provided")
 
     if isinstance(start_time, datetime.datetime):
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=datetime.timezone.utc)
+        if start_time < datetime.datetime.now(datetime.timezone.utc):
+            logger.info("Start time is in the past. Skipping addition.")
+            return False
         start_time = start_time.isoformat()
 
     if isinstance(end_time, datetime.datetime):
         end_time = end_time.isoformat()
+
+    if description:
+        description = f'{description} - Salon Booking System'
+        if get_events(query=description):
+            logger.info("Event with the same description already exists. Skipping addition.")
+            return False
+    else:
+        description = 'Salon Booking System'
 
     try:
         auth = GoogleCalendarAuth()
@@ -157,7 +171,7 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
 
         event = {
             'summary': summary,
-            'description': f'{description or ""} - Salon Booking System',
+            'description': description,
             # "source": {
             #     'title': 'Salon Booking System',
             #     'url': 'https://salon-booking-system.com',
