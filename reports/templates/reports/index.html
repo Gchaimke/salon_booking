@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Reports Index</title>
+
+    {% load static %}
+
+    <link rel="stylesheet" type="text/css" href="{% static 'reports/styles.css' %}">
+</head>
+
+<body>
+    <h1>Reports Index</h1>
+    <ul>
+        {% for report in available_reports %}
+        <li>{{ report }} (
+            {% for format in report_formats %}<a href="{% url 'reports:generate_'|add:format|lower report %}">{{ format }}</a>
+            {% if not forloop.last %}, {% endif %}
+            {% endfor %}
+            )
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+
+</html>

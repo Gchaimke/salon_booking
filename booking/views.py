@@ -1,0 +1,187 @@
+import datetime
+from typing import Dict, List
+
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_http_methods
+from django.views.generic import ListView, TemplateView, UpdateView
+from formtools.wizard.views import SessionWizardView
+from django.contrib.auth.models import User
+
+from booking.forms import (BookingCustomerForm, BookingDateForm,
+                           BookingSettingsForm, BookingTimeForm)
+from booking.models import Booking, BookingSettings
+from booking.settings import (BOOKING_BG, BOOKING_DESC, BOOKING_DISABLE_URL,
+                              BOOKING_SUCCESS_REDIRECT_URL, BOOKING_TITLE,
+                              BOOKING_PAGINATION)
+from booking.utils import BookingSettingMixin
+from django.contrib.auth.models import Group
+
+
+# # # # # # #
+# Admin Part
+# # # # # # #
+class BookingHomeView(BookingSettingMixin, TemplateView):
+    model = Booking
+    template_name = "booking/admin/dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["last_bookings"] = Booking.objects.filter().order_by("date", "time")[
+            :10]
+        context["waiting_bookings"] = Booking.objects.filter(
+            approved=False).order_by("-date", "time")[:10]
+        context["bookings_count"] = Booking.objects.values(
+            'id').distinct().count()
+        context["customers_count"] = Booking.objects.values(
+            'user_email').distinct().count()
+        context["new_customers_count"] = Booking.objects.filter(created_at__gte=datetime.datetime.now(
+        )-datetime.timedelta(days=7)).values('user_email').distinct().count()
+        context["new_bookings_count"] = Booking.objects.filter(created_at__gte=datetime.datetime.now(
+        )-datetime.timedelta(days=7)).values('id').distinct().count()
+        return context
+
+
+class BookingListView(BookingSettingMixin, ListView):
+    model = Booking
+    template_name = "booking/admin/booking_list.html"
+    paginate_by = BOOKING_PAGINATION
+
+
+class BookingSettingsView(BookingSettingMixin, UpdateView):
+    form_class = BookingSettingsForm
+    template_name = "booking/admin/booking_settings.html"
+
+    def get_object(self):
+        return BookingSettings.objects.filter().first()
+
+    def get_success_url(self):
+        return reverse("booking_settings")
+
+
+@require_http_methods(["GET", "POST"])
+@staff_member_required
+def bookingUpdateView(request, id, type):
+    if request.method == "GET":
+        item = get_object_or_404(Booking, id=id)
+        if type == "delete":
+            item.delete()
+            messages.warning(request, "The item successfully deleted!")
+        elif type == "approved":
+            item.approved = True
+            item.save()
+            messages.success(request, "The item successfully approved!")
+        return redirect(reverse("booking_list"))
+    return redirect(reverse("create_booking"))
+
+
+# # # # # # # #
+# Booking Part
+# # # # # # # #
+BOOKING_STEP_FORMS = (
+    ('Date', BookingDateForm),
+    ('Time', BookingTimeForm),
+    ('User Info', BookingCustomerForm)
+)
+
+
+class BookingCreateWizardView(SessionWizardView):
+    template_name = "booking/user/booking_wizard.html"
+    form_list = BOOKING_STEP_FORMS
+
+    def get_context_data(self, form, **kwargs):
+        context = super().get_context_data(form=form, **kwargs)
+        progress_width = "6"
+        if self.steps.current == 'Time':
+            date_data = self.get_cleaned_data_for_step('Date')
+            if date_data and isinstance(date_data, dict) and 'date' in date_data:
+                context["get_available_time"] = get_available_time(
+                    date_data["date"])
+            progress_width = "30"
+        if self.steps.current == 'User Info':
+            progress_width = "75"
+
+        context.update({
+            'booking_settings': BookingSettings.objects.first(),
+            "progress_width": progress_width,
+            "booking_bg": BOOKING_BG,
+            "description": BOOKING_DESC,
+            "title": BOOKING_TITLE
+
+        })
+        return context
+
+    def render(self, form=None, **kwargs):
+        # Check if Booking is Disable
+        form = form or self.get_form()
+        context = self.get_context_data(form=form, **kwargs)
+
+        if not context["booking_settings"].booking_enable:
+            return redirect(BOOKING_DISABLE_URL)
+
+        return self.render_to_response(context)
+
+    def done(self, form_list, **kwargs):
+        data = dict((key, value) for form in form_list for key,
+                    value in form.cleaned_data.items())
+        booking = Booking.objects.create(**data)
+        try:
+            user = User.objects.get(email=booking.user_email)
+        except User.DoesNotExist:
+            # create user
+            user = User.objects.create_user(
+                username=booking.user_email,
+                email=booking.user_email,
+                first_name=booking.user_name.split(" ")[0],
+                last_name=booking.user_name.split(" ")[1] if " " in booking.user_name else "",
+            )
+            customers_group, created = Group.objects.get_or_create(name='Customers')
+            user.groups.add(customers_group)
+        booking.user = user
+        booking.save()
+
+        if BOOKING_SUCCESS_REDIRECT_URL:
+            return redirect(BOOKING_SUCCESS_REDIRECT_URL)
+
+        return render(self.request, 'booking/user/booking_done.html', {
+            "progress_width": "100",
+            "booking_id": booking.pk,
+            "booking_bg": BOOKING_BG,
+            "description": BOOKING_DESC,
+            "title": BOOKING_TITLE
+        })
+
+
+def add_delta(time: datetime.time, delta: datetime.timedelta) -> datetime.time:
+    # transform to a full datetime first
+    return (datetime.datetime.combine(datetime.date.today(), time) + delta).time()
+
+
+def get_available_time(date: datetime.date) -> List[Dict[datetime.time, bool]]:
+    """
+    Check for all available time for selected date
+    The times should be between start_time and end_time
+    If the time already is taken -> is_taken = True
+    """
+    booking_settings = BookingSettings.objects.first()
+    if not booking_settings or not date:
+        # No booking settings configured yet — return empty availability to avoid AttributeError
+        return []
+
+    existing_bookings = Booking.objects.filter(
+        date=date).values_list('time')
+
+    next_time = booking_settings.start_time
+    time_list = []
+    while True:
+        is_taken = any([x[0] == next_time for x in existing_bookings])
+        time_list.append(
+            {"time": ":".join(str(next_time).split(":")[:-1]), "is_taken": is_taken})
+        next_time = add_delta(next_time, datetime.timedelta(
+            minutes=int(booking_settings.period_of_each_booking) + int(booking_settings.pause_between_bookings)))
+        if next_time > booking_settings.end_time:
+            break
+
+    return time_list
