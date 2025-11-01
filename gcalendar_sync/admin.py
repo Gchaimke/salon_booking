@@ -34,7 +34,7 @@ class GCalendarSyncSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(GCalendarEvent)
 class GCalendarEventAdmin(admin.ModelAdmin):
-    list_display = ("summary", "event_id", "start_time", "end_time", "sync_settings",)
+    list_display = ("summary", "event_id", "start_time", "end_time", "sync_settings", "booking",)
     search_fields = ("summary", "event_id",)
     list_filter = ("sync_settings",)
     ordering = ("-start_time",)

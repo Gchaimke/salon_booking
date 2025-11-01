@@ -1,5 +1,7 @@
 from django.db import models
 
+from booking.models import Booking
+
 
 class GCalendarSyncSettings(models.Model):
     """Model to store Google Calendar synchronization settings."""
@@ -11,11 +13,11 @@ class GCalendarSyncSettings(models.Model):
         null=True, blank=True, help_text="Timestamp of the last synchronization.")
 
     def __str__(self):
-        return f"Google Calendar Sync Settings {self.calendar_id} (Enabled: {self.enabled})"
+        return f"Calendar Sync Settings ID:{self.calendar_id} (Enabled: {self.enabled})"
 
     class Meta:
-        verbose_name = "Google Calendar Sync Settings"
-        verbose_name_plural = "Google Calendar Sync Settings"
+        verbose_name = "Calendar Sync Settings"
+        verbose_name_plural = "Calendar Sync Settings"
 
 
 class GCalendarReminder(models.Model):
@@ -41,6 +43,9 @@ class GCalendarEvent(models.Model):
     sync_settings = models.ForeignKey(
         'GCalendarSyncSettings', on_delete=models.CASCADE, related_name='events',
         help_text="The Google Calendar sync settings this event is associated with.")
+    booking = models.ForeignKey(
+        Booking, blank=True, null=True, on_delete=models.CASCADE, related_name='gcalendar_events',
+        help_text="The booking this event is associated with.")
     event_id = models.CharField(
         max_length=255, unique=True, help_text="Unique ID of the Google Calendar event.")
     summary = models.CharField(
