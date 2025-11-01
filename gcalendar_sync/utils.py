@@ -2,6 +2,7 @@
 Google Calendar utility functions for authentication and event management.
 Handles long-lived tokens for seamless integration.
 Calendar API interactions: fetch, add, remove events.
+API Docs: https://developers.google.com/workspace/calendar/api/v3/reference
 API response example:
 {'kind': 'calendar#event',
 'etag': '"3524048935994654"',
@@ -124,10 +125,9 @@ def get_events(calendar_id='primary'):
 
     now = datetime.datetime.now(
         datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
-    logger.info('Getting the upcoming 10 events')
-    events_result = service.events().list(calendarId=calendar_id, timeMin=now,
-                                          maxResults=10, singleEvents=True,
-                                          orderBy='startTime').execute()
+    logger.info('Getting the upcoming 500 events with Salon Booking System tag')
+    events_result = service.events().list(
+        calendarId=calendar_id, timeMin=now, maxResults=500, singleEvents=True, orderBy='startTime', q='Salon Booking System').execute()
     events = events_result.get('items', [])
 
     if not events:
@@ -135,23 +135,31 @@ def get_events(calendar_id='primary'):
     for event in events:
         start = event['start'].get('dateTime', event['start'].get('date'))
         end = event['end'].get('dateTime', event['end'].get('date'))
-        logger.info(f"{event['id']=} {start} - {end} : {event.get('summary', 'No Title')}")
+        logger.info(
+            f"{event['id']=} {start} - {end} : {event.get('summary', 'No Title')}")
 
 
 def add_event(calendar_id='primary', summary='New Event', description=None, start_time=None, end_time=None):
     if start_time is None or end_time is None:
         raise ValueError("start_time and end_time must be provided")
+
     if isinstance(start_time, datetime.datetime):
         start_time = start_time.isoformat()
+
     if isinstance(end_time, datetime.datetime):
         end_time = end_time.isoformat()
+
     try:
         auth = GoogleCalendarAuth()
         service = build('calendar', 'v3', credentials=auth.get_credentials())
 
         event = {
             'summary': summary,
-            'description': description,
+            'description': f'{description or ""} - Salon Booking System',
+            # "source": {
+            #     'title': 'Salon Booking System',
+            #     'url': 'https://salon-booking-system.com',
+            # },
             'start': {
                 'dateTime': start_time,
                 'timeZone': 'UTC',
@@ -159,6 +167,14 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
             'end': {
                 'dateTime': end_time,
                 'timeZone': 'UTC',
+            },
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'email', 'minutes': 24 * 60},
+                    {'method': 'popup', 'minutes': 2 * 60},
+                    {'method': 'popup', 'minutes': 10},
+                ],
             },
         }
 
@@ -184,7 +200,7 @@ def update_event(event_id, calendar_id='primary', summary=None, description=None
             event['summary'] = summary
 
         if description:
-            event['description'] = description
+            event['description'] = f'{description} - Salon Booking System'
 
         if start_time:
             if isinstance(start_time, datetime.datetime):
@@ -228,20 +244,20 @@ def remove_event(event_id, calendar_id='primary'):
 
 
 if __name__ == '__main__':
-    get_events()
     # add_event(
-    #     summary='Test Event',
+    #     summary='Test Event 3',
     #     start_time=datetime.datetime.now(
-    #         datetime.timezone.utc) + datetime.timedelta(hours=1),
+    #         datetime.timezone.utc) + datetime.timedelta(minutes=10),
     #     end_time=datetime.datetime.now(
     #         datetime.timezone.utc) + datetime.timedelta(hours=2)
     # )
-    # remove_event('akdsqtvr5tc90ganttgla3fhuk')
-    update_event(
-        event_id='akdsqtvr5tc90ganttgla3fhuk',
-        summary='Updated Test Event 3',
-        description='This is an updated test event 3.',
-        start_time='2025-11-01T22:15:23+02:00',
-        end_time='2025-11-01T22:24:23+02:00'
-    )
     get_events()
+    # remove_event('akdsqtvr5tc90ganttgla3fhuk')
+    # update_event(
+    #     event_id='akdsqtvr5tc90ganttgla3fhuk',
+    #     summary='Updated Test Event 3',
+    #     description='This is an updated test event 3.',
+    #     start_time='2025-11-01T22:15:23+02:00',
+    #     end_time='2025-11-01T22:24:23+02:00'
+    # )
+    # get_events()
