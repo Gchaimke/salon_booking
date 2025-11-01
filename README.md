@@ -22,31 +22,32 @@ call venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
-### Generate new project
+### Django cheat-list
+- Generate new project
 ```
 django-admin startproject mysite
 ```
 
-### Generate new app
+- Generate new app
 ```
 python manage.py startapp polls
 ```
 
-## Django migrate
+- Django migrate
 ```
 python manage.py makemigrations booking
 python manage.py migrate
 ```
 
-## Django create superuser
+- Django create superuser
 ```
 python manage.py createsuperuser
 ```
 
-## Django run non-production server
+- Django run non-production server
 ```
 python manage.py runserver
 ```
 
-## Django run tests
+- Django run tests
 python manage.py test booking
