@@ -21,10 +21,12 @@ python -m venv venv
 ```
 .\venv\Scripts\activate.bat
 ```
-OR
+or
 ```
 call venv/Scripts/activate
 ```
+
+Install requirements
 ```
 pip install -r requirements.txt
 ```
