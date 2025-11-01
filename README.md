@@ -21,7 +21,7 @@ python -m venv venv
 ```
 .\venv\Scripts\activate.bat
 ```
-# OR
+OR
 ```
 call venv/Scripts/activate
 ```
