@@ -15,6 +15,7 @@ git clone https://github.com/Gchaimke/salon_booking.git
 ```
 cd folder
 ```
+```
 python -m venv venv
 ```
 ```

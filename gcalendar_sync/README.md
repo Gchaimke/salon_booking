@@ -1,13 +1,13 @@
 # Step 1:
 ## Create a Google API Project
-- To create a Google API project, follow these steps:
+To create a Google API project, follow these steps:
 - Go to the Google API Console (https://console.developers.google.com/)
 - Click on the ‘Select a project’ drop-down, then on the ‘+’ button to create a new project.
 - Name the project and click ‘Create’.
 
 # Step 2:
 ## Enable Google Calendar API
-- After creating your project, you need to enable the Google Calendar API for it:
+After creating your project, you need to enable the Google Calendar API for it:
 - In the Google API Console, ensure your new project is selected.
 - Click on ‘Library’ in the left sidebar.
 - Find ‘Google Calendar API’ and click on it.
