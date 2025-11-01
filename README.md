@@ -33,21 +33,23 @@ django-admin startproject mysite
 python manage.py startapp polls
 ```
 
-- Django migrate
+- Migrate
 ```
 python manage.py makemigrations booking
 python manage.py migrate
 ```
 
-- Django create superuser
+- Create superuser
 ```
 python manage.py createsuperuser
 ```
 
-- Django run non-production server
+- Run non-production server
 ```
 python manage.py runserver
 ```
 
-- Django run tests
+- Run tests
+```
 python manage.py test booking
+```
