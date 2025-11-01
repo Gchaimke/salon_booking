@@ -44,7 +44,7 @@ python manage.py startapp polls
 
 - Migrate
 ```
-python manage.py makemigrations booking
+python manage.py makemigrations <booking>
 python manage.py migrate
 ```
 

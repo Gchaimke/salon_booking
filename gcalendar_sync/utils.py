@@ -1,14 +1,16 @@
 """
 Google Calendar utility functions for authentication and event management.
 Handles long-lived tokens for seamless integration.
+Manage API credentials in https://console.cloud.google.com.
 Calendar API interactions: fetch, add, remove events.
 API Docs: https://developers.google.com/workspace/calendar/api/v3/reference
+
 API response example:
 {'kind': 'calendar#event',
-'etag': '"3524048935994654"',
-'id': '7uq9d6r16cfp2t0m9tq7gvck6c',
+'etag': '"3524994654"',
+'id': '7uq9dk6c',
 'status': 'confirmed',
-'htmlLink': 'https://www.google.com/calendar/event?eid=N3VxOWQ2cjE2Y2ZwMnQwbTl0cTdndmNrNmMgZ2NoYWlta2VAbQ',
+'htmlLink': 'https://www.google.com/calendar/event?eid=N3V2NoYWlta2VAbQ',
 'created': '2025-11-01T19:14:27.000Z',
 'updated': '2025-11-01T19:14:27.997Z',
 'summary': 'Test Event',
@@ -16,7 +18,7 @@ API response example:
 'organizer': {'email': 'gchaimke@gmail.com', 'self': True},
 'start': {'dateTime': '2025-11-01T22:14:28+02:00', 'timeZone': 'UTC'},
 'end': {'dateTime': '2025-11-01T23:14:28+02:00', 'timeZone': 'UTC'},
-'iCalUID': '7uq9d6r16cfp2t0m9tq7gvck6c@google.com',
+'iCalUID': '7uq9dk6c@google.com',
 'sequence': 0,
 'reminders': {'useDefault': True},
 'eventType': 'default'}
