@@ -1,6 +1,7 @@
 # Salon booking service
 
 This project based on Django framework
+Django: https://docs.djangoproject.com/en/5.2/
 
 ## In current project will be implemented modules
 - Booking system
@@ -14,7 +15,7 @@ cd folder
 python -m venv venv
 .\venv\Scripts\activate.bat
 ```
-# OR
+### OR
 ```
 call venv/Scripts/activate
 pip install -r requirements.txt
