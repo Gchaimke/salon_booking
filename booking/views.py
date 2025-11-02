@@ -10,9 +10,9 @@ from django.views.generic import ListView, TemplateView, UpdateView
 from formtools.wizard.views import SessionWizardView
 from django.contrib.auth.models import User
 
-from booking.forms import (BookingCustomerForm, BookingDateForm,
+from booking.forms import (BookingCustomerForm, BookingDateForm, BookingServiceForm,
                            BookingSettingsForm, BookingTimeForm)
-from booking.models import Booking, BookingSettings
+from booking.models import Booking, BookingSettings, BookingService
 from booking.settings import (BOOKING_BG, BOOKING_DESC,
                               BOOKING_SUCCESS_REDIRECT_URL, BOOKING_TITLE,
                               BOOKING_PAGINATION)
@@ -81,6 +81,7 @@ def bookingUpdateView(request, id, type):
 # Booking Part
 # # # # # # # #
 BOOKING_STEP_FORMS = (
+    ('Service', BookingServiceForm),
     ('Date', BookingDateForm),
     ('Time', BookingTimeForm),
     ('User Info', BookingCustomerForm)
@@ -93,13 +94,18 @@ class BookingCreateWizardView(SessionWizardView):
 
     def get_context_data(self, form, **kwargs):
         context = super().get_context_data(form=form, **kwargs)
-        progress_width = "6"
+        progress_width = "0"
+        service_data = self.get_cleaned_data_for_step('Service')
+        if service_data and isinstance(service_data, dict) and 'service' in service_data:
+            service = name = service_data["service"]
+        if self.steps.current == 'Date':
+            progress_width = "25"
         if self.steps.current == 'Time':
             date_data = self.get_cleaned_data_for_step('Date')
-            if date_data and isinstance(date_data, dict) and 'date' in date_data:
+            if date_data and isinstance(date_data, dict) and 'date' in date_data and service:
                 context["get_available_time"] = get_available_time(
-                    date_data["date"])
-            progress_width = "30"
+                    date_data["date"], service)
+            progress_width = "50"
         if self.steps.current == 'User Info':
             progress_width = "75"
 
@@ -120,10 +126,10 @@ class BookingCreateWizardView(SessionWizardView):
 
         if not context["booking_settings"].booking_enable:
             return render(self.request, 'booking/user/booking_disabled.html', {
-            "description": 'Currently, bookings are disabled. Please try again later.',
-            "title": 'Booking Disabled',
-            "booking_bg": BOOKING_BG,
-        })
+                "description": 'Currently, bookings are disabled. Please try again later.',
+                "title": 'Booking Disabled',
+                "booking_bg": BOOKING_BG,
+            })
 
         return self.render_to_response(context)
 
@@ -139,9 +145,11 @@ class BookingCreateWizardView(SessionWizardView):
                 username=booking.user_email,
                 email=booking.user_email,
                 first_name=booking.user_name.split(" ")[0],
-                last_name=booking.user_name.split(" ")[1] if " " in booking.user_name else "",
+                last_name=booking.user_name.split(
+                    " ")[1] if " " in booking.user_name else "",
             )
-            customers_group, created = Group.objects.get_or_create(name='Customers')
+            customers_group, created = Group.objects.get_or_create(
+                name='Customers')
             user.groups.add(customers_group)
         booking.user = user
         booking.save()
@@ -163,7 +171,7 @@ def add_delta(time: datetime.time, delta: datetime.timedelta) -> datetime.time:
     return (datetime.datetime.combine(datetime.date.today(), time) + delta).time()
 
 
-def get_available_time(date: datetime.date) -> List[Dict[datetime.time, bool]]:
+def get_available_time(date: datetime.date, service: BookingService) -> List[Dict[datetime.time, bool]]:
     """
     Check for all available time for selected date
     The times should be between start_time and end_time
@@ -175,17 +183,26 @@ def get_available_time(date: datetime.date) -> List[Dict[datetime.time, bool]]:
         return []
 
     existing_bookings = Booking.objects.filter(
-        date=date).values_list('time')
+        date=date).values_list('time', 'service__duration')
+    existing_bookings_ranges = []
+    for booking_time, duration in existing_bookings:
+        existing_bookings_ranges.append(
+            (booking_time, add_delta(booking_time, datetime.timedelta(
+                minutes=int(duration)+int(booking_settings.pause_between_bookings))))
+        )
 
     next_time = booking_settings.start_time
     time_list = []
     while True:
-        is_taken = any([x[0] == next_time for x in existing_bookings])
+        is_taken = False
+        for start_time, end_time in existing_bookings_ranges:
+            if start_time <= next_time <= end_time:
+                is_taken = True
         time_list.append(
             {"time": ":".join(str(next_time).split(":")[:-1]), "is_taken": is_taken})
         next_time = add_delta(next_time, datetime.timedelta(
-            minutes=int(booking_settings.period_of_each_booking) + int(booking_settings.pause_between_bookings)))
-        if next_time > booking_settings.end_time:
+            minutes=int(service.duration) + int(booking_settings.pause_between_bookings)))
+        if next_time >= booking_settings.end_time:
             break
 
     return time_list

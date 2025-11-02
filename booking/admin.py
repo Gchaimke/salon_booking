@@ -6,19 +6,21 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpResponseRedirect
-from booking.models import Booking, BookingSettings
+from booking.models import Booking, BookingSettings, BookingService
 
 logger = logging.getLogger(__name__)
 
 
 try:
     from gcalendar_sync.models import GCalendarEvent
-    from gcalendar_sync.utils import add_event # type: ignore
+    from gcalendar_sync.utils import add_event  # type: ignore
     from gcalendar_sync.utils import sync_bookings_with_events
 except ImportError:
     GCalendarEvent = None
+
     def add_event(**kwargs):
         return False
+
     def sync_bookings_with_events():
         return
 
@@ -26,7 +28,7 @@ except ImportError:
 class BookingAdmin(admin.ModelAdmin):
     change_list_template = 'booking/admin/change_list.html'
     list_display = ['user', "user_name",
-                    "user_email", "date", "time", "approved"]
+                    "user_email", "date", "time", "service", "approved"]
     list_filter = ["approved", "date", 'user',
                    'user__groups', 'user__is_staff']
     search_fields = ['user__username',
@@ -84,9 +86,8 @@ class BookingAdmin(admin.ModelAdmin):
                     booking_settings = BookingSettings.objects.first()
                     if booking_settings:
                         event_end_time = datetime.datetime.combine(
-                            booking.date, booking.time) + datetime.timedelta(
-                                minutes=float(booking_settings.period_of_each_booking) + float(booking_settings.pause_between_bookings))
-                    response = add_event(
+                            booking.date, booking.time) + datetime.timedelta(minutes=float(booking.service.duration))
+                    add_event(
                         summary=f'Booking for {booking.user_name}',
                         description=f'User Email: {booking.user_email}, User Phone: {booking.user_mobile}, Booking ID: {booking.id}',
                         start_time=datetime.datetime.combine(
@@ -101,11 +102,11 @@ class BookingAdmin(admin.ModelAdmin):
         sync_bookings_with_events()
     sync_with_calendar.short_description = "Sync selected bookings with Google Calendar"
 
-
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('sync_with_calendar/', self.admin_site.admin_view(self.sync_all_with_calendar), name='sync_with_calendar'),
+            path('sync_with_calendar/', self.admin_site.admin_view(
+                self.sync_all_with_calendar), name='sync_with_calendar'),
         ]
         return custom_urls + urls
 
@@ -116,8 +117,21 @@ class BookingAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Booking, BookingAdmin)
-# admin.site.register(Booking)
-admin.site.register(BookingSettings)
+
+
+class BookingServicesInline(admin.StackedInline):
+    model = BookingService
+    extra = 1
+    verbose_name = 'Booking Service'
+    verbose_name_plural = 'Booking Services'
+    list_display = ['name', 'duration', 'price']
+
+
+class BookingSettingsAdmin(admin.ModelAdmin):
+    inlines = [BookingServicesInline]
+
+
+admin.site.register(BookingSettings, BookingSettingsAdmin)
 
 
 class BookingInline(admin.TabularInline):

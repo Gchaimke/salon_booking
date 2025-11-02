@@ -1,6 +1,6 @@
 from django import forms
 
-from booking.models import BookingSettings
+from booking.models import BookingSettings, BookingService
 
 
 class ChangeInputsStyle(forms.Form):
@@ -19,6 +19,11 @@ class ChangeInputsStyle(forms.Form):
             widget.attrs.update({
                 'class': classes
             })
+
+
+class BookingServiceForm(ChangeInputsStyle):
+    service = forms.ModelChoiceField(
+        queryset=BookingService.objects.all(), required=True)
 
 
 class BookingDateForm(ChangeInputsStyle):
