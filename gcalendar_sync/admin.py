@@ -26,10 +26,10 @@ class GCalendarSyncSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(GCalendarEvent)
 class GCalendarEventAdmin(admin.ModelAdmin):
-    list_display = ("summary", "event_id", "start_time",
-                    "end_time", "sync_settings", "booking",)
-    search_fields = ("summary", "event_id",)
-    list_filter = ("sync_settings",)
+    list_display = ("booking", "summary", "start_time",
+                    "end_time", "created_at", "updated_at")
+    search_fields = ("summary", "event_id", "description")
+    list_filter = ("summary",)
     ordering = ("-start_time",)
     readonly_fields = ("created_at", "updated_at",)
 

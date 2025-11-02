@@ -33,6 +33,7 @@ class BookingAdmin(admin.ModelAdmin):
                    'user__groups', 'user__is_staff']
     search_fields = ['user__username',
                      "user_name", "user_email", "user_mobile"]
+    list_editable = ["approved"]
     list_per_page = 50
     ordering = ["-date", "-time"]
     actions = ['approve_bookings', 'reject_bookings', 'sync_user_and_customer']
@@ -88,8 +89,8 @@ class BookingAdmin(admin.ModelAdmin):
                         event_end_time = datetime.datetime.combine(
                             booking.date, booking.time) + datetime.timedelta(minutes=float(booking.service.duration))
                     add_event(
-                        summary=f'Booking for {booking.user_name}',
-                        description=f'User Email: {booking.user_email}, User Phone: {booking.user_mobile}, Booking ID: {booking.id}',
+                        summary=f'Booking {booking.service.name}, duration {booking.service.duration} minutes is approved',
+                        description=f'User Email: {booking.user_email}, User Phone: {booking.user_mobile}, Service: {booking.service.name}, Booking ID: {booking.id}',
                         start_time=datetime.datetime.combine(
                             booking.date, booking.time),
                         end_time=event_end_time)
