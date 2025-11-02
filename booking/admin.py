@@ -84,7 +84,8 @@ class BookingAdmin(admin.ModelAdmin):
         reminders_overrides = []
         sync_settings = GCalendarSyncSettings.objects.filter(enabled=True).last()
         if sync_settings and hasattr(sync_settings, 'reminders'):
-            reminders_overrides = [{'method': reminder.method, 'minutes': reminder.minutes_before} for reminder in sync_settings.reminders.all()]
+            reminders = getattr(sync_settings, 'reminders').all() or []
+            reminders_overrides = [{'method': reminder.method, 'minutes': reminder.minutes_before} for reminder in reminders]
         for booking in queryset:
             if booking.approved:
                 event = GCalendarEvent.objects.filter(booking=booking).first()
