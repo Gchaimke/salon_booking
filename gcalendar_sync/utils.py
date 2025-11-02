@@ -25,6 +25,7 @@ API response example:
 
 """
 
+import re
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -32,6 +33,8 @@ from googleapiclient.discovery import build
 import datetime
 from pathlib import Path
 import logging
+from django.conf import settings
+import zoneinfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,6 +43,13 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent.joinpath('gcalendar_sync')
 CREDS_PATH = BASE_DIR / 'secrets' / 'credentials.json'
 TOKEN_PATH = BASE_DIR / 'secrets' / 'token.json'
+
+try:
+    settings.configure()
+except Exception as e:
+    pass
+
+SYSTEM_TIMEZONE = zoneinfo.ZoneInfo(getattr(settings, 'TIME_ZONE', 'UTC'))
 
 
 class GoogleCalendarAuth:
@@ -146,21 +156,21 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
     if start_time is None or end_time is None:
         raise ValueError("start_time and end_time must be provided")
 
-    if isinstance(start_time, datetime.datetime):
-        if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=datetime.timezone.utc)
-        if start_time < datetime.datetime.now(datetime.timezone.utc):
-            logger.info("Start time is in the past. Skipping addition.")
-            return False
-        start_time = start_time.isoformat()
+    logger.info(f"Original: {start_time=}, {end_time=}")
+    start_time = get_time_with_timezone(start_time)
+    end_time = get_time_with_timezone(end_time)
+    logger.info(f"Updated: {start_time=}, {end_time=}")
+    
 
-    if isinstance(end_time, datetime.datetime):
-        end_time = end_time.isoformat()
+    if start_time < datetime.datetime.now(SYSTEM_TIMEZONE):
+        logger.info("Start time is in the past. Skipping addition.")
+        return False
 
     if description:
         description = f'{description} - Salon Booking System'
         if get_events(query=description):
-            logger.info("Event with the same description already exists. Skipping addition.")
+            logger.debug(
+                "Event with the same description already exists. Skipping addition.")
             return False
     else:
         description = 'Salon Booking System'
@@ -177,11 +187,11 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
             #     'url': 'https://salon-booking-system.com',
             # },
             'start': {
-                'dateTime': start_time,
+                'dateTime': start_time.isoformat(),
                 'timeZone': 'UTC',
             },
             'end': {
-                'dateTime': end_time,
+                'dateTime': end_time.isoformat(),
                 'timeZone': 'UTC',
             },
             'reminders': {
@@ -258,6 +268,57 @@ def remove_event(event_id, calendar_id='primary'):
         logger.error(f"Failed to remove event: {e}")
         return False
 
+
+def get_time_with_timezone(dt: datetime.datetime | str | None = None) -> datetime.datetime:
+    """Get datetime with system timezone."""
+    if isinstance(dt, str):
+        dt = datetime.datetime.fromisoformat(dt)
+
+    if dt is None:
+        dt = datetime.datetime.now(tz=SYSTEM_TIMEZONE)
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=SYSTEM_TIMEZONE)
+
+    return dt
+
+
+def sync_bookings_with_events():
+    """Sync bookings with Google Calendar events."""
+    try:
+        from booking.models import Booking
+    except ImportError:
+        Booking = None
+    from gcalendar_sync.models import GCalendarSyncSettings, GCalendarEvent
+
+    sync_settings = GCalendarSyncSettings.objects.filter(enabled=True).last()
+    if not sync_settings:
+        logger.warning("No enabled sync settings found.")
+        return
+
+    calendar_events = get_events(calendar_id=sync_settings.calendar_id)
+    logger.info(f"Fetched {len(calendar_events)} events from calendar ID {sync_settings.calendar_id}")
+    regex_pattern = re.compile(r'Booking ID: (\d+)')
+    for event in calendar_events:
+        description = event.get('description', '')
+        booking = None
+        if Booking:
+            match = regex_pattern.search(description)
+            if booking_id := int(match.group(1)) if match else None:
+                booking = Booking.objects.filter(id=booking_id).first()
+        GCalendarEvent.objects.update_or_create(
+            event_id=event.get('id'),
+            sync_settings=sync_settings,
+            booking=booking,
+            defaults={
+                'summary': event.get('summary', ''),
+                'description': event.get('description', ''),
+                'start_time': event['start'].get('dateTime') or event['start'].get('date'),
+                'end_time': event['end'].get('dateTime') or event['end'].get('date'),
+            }
+        )
+    sync_settings.last_synced = datetime.datetime.now(SYSTEM_TIMEZONE)
+    sync_settings.save()
 
 if __name__ == '__main__':
     # add_event(

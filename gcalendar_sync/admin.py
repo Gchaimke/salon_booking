@@ -1,18 +1,10 @@
-import datetime
 import logging
 from django.contrib import admin
-from gcalendar_sync.utils import get_events
+from gcalendar_sync.utils import remove_event
 
 from .models import GCalendarReminder, GCalendarSyncSettings, GCalendarEvent
-import re
-
-try:
-    from booking.models import Booking
-except ImportError:
-    Booking = None
 
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -31,41 +23,6 @@ class GCalendarSyncSettingsAdmin(admin.ModelAdmin):
     actions = ['sync_now']
     inlines = [GCalendarReminderInline]
 
-    def sync_now(self, request, queryset):
-        synced = 0
-        for item in queryset:
-            if item.enabled:
-                # Here you would add the logic to trigger synchronization
-                item.last_synced = datetime.datetime.now(datetime.timezone.utc)
-                item.save()
-                synced += 1
-                calendar_events = get_events(calendar_id=item.calendar_id)
-                logger.info(f"Fetched {len(calendar_events)} events from calendar ID {item.calendar_id}")
-                regex_pattern = r'Booking ID: (\d+)'
-                for event in calendar_events:
-                    # Extract booking ID from description using regex
-                    description = event.get('description', '')
-                    booking = None
-                    # check if Booking model is available
-                    if Booking:
-                        match = re.search(regex_pattern, description)
-                        if booking_id := int(match.group(1)) if match else None:
-                            booking = Booking.objects.filter(id=booking_id).first()
-                    GCalendarEvent.objects.update_or_create(
-                        event_id=event.get('id'),
-                        sync_settings=item,
-                        booking=booking,
-                        defaults={
-                            'summary': event.get('summary', ''),
-                            'description': event.get('description', ''),
-                            'start_time': event['start'].get('dateTime') or event['start'].get('date'),
-                            'end_time': event['end'].get('dateTime') or event['end'].get('date'),
-                        }
-                    )
-        self.message_user(
-            request, f'{synced} calendar(s) synchronization triggered. ID: {item.calendar_id}. Got {len(calendar_events)} event(s).')
-    sync_now.short_description = "Sync selected calendars now"
-
 
 @admin.register(GCalendarEvent)
 class GCalendarEventAdmin(admin.ModelAdmin):
@@ -75,3 +32,22 @@ class GCalendarEventAdmin(admin.ModelAdmin):
     list_filter = ("sync_settings",)
     ordering = ("-start_time",)
     readonly_fields = ("created_at", "updated_at",)
+
+    def delete_model(self, request, obj):
+        logger.warning(f"About to delete object: {obj}")
+        sync_settings = GCalendarSyncSettings.objects.filter(
+            enabled=True).last()
+        remove_event(
+            obj.event_id, calendar_id=sync_settings.calendar_id if sync_settings else 'primary')
+        super().delete_model(request, obj)
+        logger.warning(f"Object deleted: {obj}")
+
+    def delete_queryset(self, request, queryset):
+        logger.warning(f"About to delete queryset: {queryset}")
+        sync_settings = GCalendarSyncSettings.objects.filter(
+            enabled=True).last()
+        for obj in queryset:
+            remove_event(
+                obj.event_id, calendar_id=sync_settings.calendar_id if sync_settings else 'primary')
+        super().delete_queryset(request, queryset)
+        logger.warning(f"Queryset deleted.")

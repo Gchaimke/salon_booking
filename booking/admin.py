@@ -1,22 +1,30 @@
 import datetime
+import logging
 from math import e
-from os import error
+from django.urls import path, reverse
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.http import HttpResponseRedirect
 from booking.models import Booking, BookingSettings
+
+logger = logging.getLogger(__name__)
 
 
 try:
     from gcalendar_sync.models import GCalendarEvent
     from gcalendar_sync.utils import add_event # type: ignore
+    from gcalendar_sync.utils import sync_bookings_with_events
 except ImportError:
     GCalendarEvent = None
     def add_event(**kwargs):
         return False
+    def sync_bookings_with_events():
+        return
 
 
 class BookingAdmin(admin.ModelAdmin):
+    change_list_template = 'booking/admin/change_list.html'
     list_display = ['user', "user_name",
                     "user_email", "date", "time", "approved"]
     list_filter = ["approved", "date", 'user',
@@ -85,13 +93,26 @@ class BookingAdmin(admin.ModelAdmin):
                             booking.date, booking.time),
                         end_time=event_end_time)
 
-                    if response:
-                        synced_count += 1
-                    else:
-                        skipped_count += 1
+                    synced_count += 1
+                else:
+                    skipped_count += 1
         self.message_user(
             request, f'Successfully synced {synced_count} bookings with Google Calendar and skipped {skipped_count} bookings.')
+        sync_bookings_with_events()
     sync_with_calendar.short_description = "Sync selected bookings with Google Calendar"
+
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('sync_with_calendar/', self.admin_site.admin_view(self.sync_all_with_calendar), name='sync_with_calendar'),
+        ]
+        return custom_urls + urls
+
+    def sync_all_with_calendar(self, request):
+        self.sync_with_calendar(request, Booking.objects.all())
+        logger.info(f'Calendar synchronization triggered from admin.')
+        return HttpResponseRedirect(reverse('admin:booking_booking_changelist'))
 
 
 admin.site.register(Booking, BookingAdmin)
