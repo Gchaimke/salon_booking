@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpResponseRedirect
 from booking.models import Booking, BookingSettings, BookingService
+from gcalendar_sync.models import GCalendarSyncSettings
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,10 @@ class BookingAdmin(admin.ModelAdmin):
             return
         synced_count = 0
         skipped_count = 0
+        reminders_overrides = []
+        sync_settings = GCalendarSyncSettings.objects.filter(enabled=True).last()
+        if sync_settings and hasattr(sync_settings, 'reminders'):
+            reminders_overrides = [{'method': reminder.method, 'minutes': reminder.minutes_before} for reminder in sync_settings.reminders.all()]
         for booking in queryset:
             if booking.approved:
                 event = GCalendarEvent.objects.filter(booking=booking).first()
@@ -93,7 +98,9 @@ class BookingAdmin(admin.ModelAdmin):
                         description=f'User Email: {booking.user_email}, User Phone: {booking.user_mobile}, Service: {booking.service.name}, Booking ID: {booking.id}',
                         start_time=datetime.datetime.combine(
                             booking.date, booking.time),
-                        end_time=event_end_time)
+                        end_time=event_end_time,
+                        reminders_overrides=reminders_overrides
+                        )
 
                     synced_count += 1
                 else:

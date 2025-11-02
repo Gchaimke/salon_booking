@@ -35,19 +35,10 @@ class GCalendarEventAdmin(admin.ModelAdmin):
 
     def delete_model(self, request, obj):
         logger.warning(f"About to delete object: {obj}")
-        sync_settings = GCalendarSyncSettings.objects.filter(
-            enabled=True).last()
-        remove_event(
-            obj.event_id, calendar_id=sync_settings.calendar_id if sync_settings else 'primary')
         super().delete_model(request, obj)
         logger.warning(f"Object deleted: {obj}")
 
     def delete_queryset(self, request, queryset):
         logger.warning(f"About to delete queryset: {queryset}")
-        sync_settings = GCalendarSyncSettings.objects.filter(
-            enabled=True).last()
-        for obj in queryset:
-            remove_event(
-                obj.event_id, calendar_id=sync_settings.calendar_id if sync_settings else 'primary')
         super().delete_queryset(request, queryset)
         logger.warning(f"Queryset deleted.")

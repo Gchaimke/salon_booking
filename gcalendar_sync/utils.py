@@ -152,7 +152,10 @@ def get_events(calendar_id='primary', query=None):
     return events
 
 
-def add_event(calendar_id='primary', summary='New Event', description=None, start_time=None, end_time=None):
+def add_event(calendar_id='primary', summary='New Event', description=None, start_time=None, end_time=None, reminders_overrides=None):
+    if reminders_overrides is None:
+        reminders_overrides = []
+
     if start_time is None or end_time is None:
         raise ValueError("start_time and end_time must be provided")
 
@@ -196,11 +199,7 @@ def add_event(calendar_id='primary', summary='New Event', description=None, star
             },
             'reminders': {
                 'useDefault': False,
-                'overrides': [
-                    {'method': 'email', 'minutes': 24 * 60},
-                    {'method': 'popup', 'minutes': 2 * 60},
-                    {'method': 'popup', 'minutes': 10},
-                ],
+                'overrides': reminders_overrides,
             },
         }
 

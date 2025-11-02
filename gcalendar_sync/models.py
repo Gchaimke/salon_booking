@@ -1,4 +1,9 @@
+import logging
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+
+from gcalendar_sync.utils import remove_event
 
 try:
     # Import Booking model if available
@@ -7,12 +12,15 @@ except ImportError:
     Booking = None
 
 
+logger = logging.getLogger(__name__)
+
+
 class GCalendarSyncSettings(models.Model):
     """Model to store Google Calendar synchronization settings."""
     enabled = models.BooleanField(
-        default=False, help_text="Enable or disable Google Calendar synchronization.")
+        default=True, help_text="Enable or disable Google Calendar synchronization.")
     calendar_id = models.CharField(
-        max_length=255, blank=True, help_text="Google Calendar ID to sync with. ( use 'primary' for main calendar )")
+        max_length=255, default='primary', help_text="Google Calendar ID to sync with. ( use 'primary' for main calendar )")
     last_synced = models.DateTimeField(
         null=True, blank=True, help_text="Timestamp of the last synchronization.")
 
@@ -70,3 +78,16 @@ class GCalendarEvent(models.Model):
     class Meta:
         verbose_name = "Google Calendar Event"
         verbose_name_plural = "Google Calendar Events"
+
+
+@receiver(post_delete, sender=GCalendarEvent)
+def remove_event_from_google_calendar(sender, instance, using, **kwargs):
+    # Custom logic to be executed on object deletion
+    logger.warning(f"Object {instance} of {sender.__name__} was deleted with {using}.")
+    sync_settings = GCalendarSyncSettings.objects.filter(enabled=True).last()
+    calendar_id = 'primary'
+    if sync_settings:
+        calendar_id = sync_settings.calendar_id
+
+    logger.warning(f"Also removing event from Google Calendar: {instance.event_id=}.")
+    remove_event(instance.event_id, calendar_id=calendar_id)
