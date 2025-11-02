@@ -1,12 +1,15 @@
 import datetime
 import logging
 from django.contrib import admin
-if 'Booking' in globals():
-    from booking.models import Booking
 from gcalendar_sync.utils import get_events
 
 from .models import GCalendarReminder, GCalendarSyncSettings, GCalendarEvent
 import re
+
+try:
+    from booking.models import Booking
+except ImportError:
+    Booking = None
 
 
 logging.basicConfig(level=logging.INFO)
@@ -37,24 +40,26 @@ class GCalendarSyncSettingsAdmin(admin.ModelAdmin):
                 item.save()
                 synced += 1
                 calendar_events = get_events(calendar_id=item.calendar_id)
+                logger.info(f"Fetched {len(calendar_events)} events from calendar ID {item.calendar_id}")
+                regex_pattern = r'Booking ID: (\d+)'
                 for event in calendar_events:
                     # Extract booking ID from description using regex
                     description = event.get('description', '')
-                    booking_id = None
-                    if 'Booking' in globals() and Booking:
-                        if 'Booking ID: ' in description:
-                            match = re.search(
-                                r'Booking ID: (\d+)', description)
-                            booking_id = int(match.group(1)) if match else None
+                    booking = None
+                    # check if Booking model is available
+                    if Booking:
+                        match = re.search(regex_pattern, description)
+                        if booking_id := int(match.group(1)) if match else None:
+                            booking = Booking.objects.filter(id=booking_id).first()
                     GCalendarEvent.objects.update_or_create(
                         event_id=event.get('id'),
                         sync_settings=item,
+                        booking=booking,
                         defaults={
                             'summary': event.get('summary', ''),
                             'description': event.get('description', ''),
                             'start_time': event['start'].get('dateTime') or event['start'].get('date'),
                             'end_time': event['end'].get('dateTime') or event['end'].get('date'),
-                            'booking': int(booking_id) if booking_id else None,
                         }
                     )
         self.message_user(

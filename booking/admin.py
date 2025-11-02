@@ -5,8 +5,15 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from booking.models import Booking, BookingSettings
-from gcalendar_sync.models import GCalendarEvent
-from gcalendar_sync.utils import add_event
+
+
+try:
+    from gcalendar_sync.models import GCalendarEvent
+    from gcalendar_sync.utils import add_event # type: ignore
+except ImportError:
+    GCalendarEvent = None
+    def add_event(**kwargs):
+        return False
 
 
 class BookingAdmin(admin.ModelAdmin):
@@ -18,8 +25,9 @@ class BookingAdmin(admin.ModelAdmin):
                      "user_name", "user_email", "user_mobile"]
     list_per_page = 50
     ordering = ["-date", "-time"]
-    actions = ['approve_bookings', 'reject_bookings',
-               'sync_user_and_customer', 'sync_with_calendar']
+    actions = ['approve_bookings', 'reject_bookings', 'sync_user_and_customer']
+    if GCalendarEvent:
+        actions.append('sync_with_calendar')
 
     def approve_bookings(self, request, queryset):
         updated = queryset.update(approved=True)
@@ -57,6 +65,8 @@ class BookingAdmin(admin.ModelAdmin):
     sync_user_and_customer.short_description = "Sync user and customer for selected bookings"
 
     def sync_with_calendar(self, request, queryset):
+        if not GCalendarEvent:
+            return
         synced_count = 0
         skipped_count = 0
         for booking in queryset:
