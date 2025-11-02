@@ -140,3 +140,49 @@ if not TESTING:
         "debug_toolbar.middleware.DebugToolbarMiddleware",
         *MIDDLEWARE,
     ]
+
+
+# Logging configuration
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname}: {message}. source: {pathname}::{funcName} line:{lineno}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{asctime}] {levelname}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'rotating_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'salon_booking.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'rotating_file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'booking': {
+            'handlers': ['console', 'rotating_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
