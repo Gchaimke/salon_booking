@@ -12,12 +12,12 @@ class GCalendarSyncSettings(models.Model):
     enabled = models.BooleanField(
         default=False, help_text="Enable or disable Google Calendar synchronization.")
     calendar_id = models.CharField(
-        max_length=255, blank=True, help_text="Google Calendar ID to sync with.")
+        max_length=255, blank=True, help_text="Google Calendar ID to sync with. ( use 'primary' for main calendar )")
     last_synced = models.DateTimeField(
         null=True, blank=True, help_text="Timestamp of the last synchronization.")
 
     def __str__(self):
-        return f"Calendar Sync Settings ID:{self.calendar_id} (Enabled: {self.enabled})"
+        return f"Calendar Sync Settings ID:{self.calendar_id}"
 
     class Meta:
         verbose_name = "Calendar Sync Settings"
