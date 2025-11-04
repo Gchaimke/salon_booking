@@ -21,6 +21,9 @@ BOOKING_PERIOD = (
     ("180", "3H"),
 )
 
+DEFAULT_EMAIL_BODY = """Dear {{booking.user_name}},\n\nYour booking for {{booking.service.name}} on 
+                        {{booking.date}} at {{booking.time}} has been approved.\n\nThank you!"""
+
 
 class BookingSettings(models.Model):
     # General
@@ -35,6 +38,9 @@ class BookingSettings(models.Model):
     end_time = models.TimeField(help_text='End Time for available booking')
     pause_between_bookings = models.CharField(
         max_length=3, default="0", choices=BOOKING_PERIOD, help_text="How long to wait between bookings.")
+
+    def __str__(self) -> str:
+        return f"Booking Settings: {self.pk or 'New'}"
 
     class Meta:
         verbose_name = "Booking Settings"
@@ -55,11 +61,39 @@ class BookingService(models.Model):
         return f'{self.name} - {self.duration} minutes - {self.price}'
 
 
+class BookingAlertEmail(models.Model):
+    booking_settings = models.ForeignKey(
+        BookingSettings, on_delete=models.CASCADE, related_name='alert_emails', null=True)
+    email_subject = models.CharField(
+        max_length=250, null=True, blank=True, help_text="Email subject for booking alerts.")
+    email_header = models.CharField(
+        max_length=250, null=True, blank=True, help_text="Email header for booking alerts.")
+    email_body = models.TextField(
+        null=True, blank=True, help_text="Email template for booking alerts.", default=DEFAULT_EMAIL_BODY)
+
+    def __str__(self) -> str:
+        return f"Booking Alert Email: {self.pk or 'New'}"
+
+
+class BookingAlertSMS(models.Model):
+    booking_settings = models.ForeignKey(
+        BookingSettings, on_delete=models.CASCADE, related_name='alert_sms', null=True)
+    sms_body = models.TextField(
+        null=True, blank=True, help_text="SMS template for booking alerts.")
+
+    def __str__(self) -> str:
+        return f"Booking Alert SMS: {self.pk or 'New'}"
+
+
 class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, blank=True, null=True)
     service = models.ForeignKey(
         BookingService, on_delete=models.CASCADE, related_name='bookings', blank=True, null=True)
+    email_alerts = models.ForeignKey(
+        BookingAlertEmail, blank=True, null=True, related_name='bookings', name='email_alerts', on_delete=models.SET_NULL, default=BookingAlertEmail.objects.first)
+    sms_alerts = models.ForeignKey(
+        BookingAlertSMS, blank=True, null=True, related_name='bookings', name='sms_alerts', on_delete=models.SET_NULL, default=BookingAlertSMS.objects.first)
     date = models.DateField()
     time = models.TimeField()
     user_name = models.CharField(max_length=250)
@@ -72,3 +106,11 @@ class Booking(models.Model):
 
     def __str__(self) -> str:
         return self.user_name or "(No Name)"
+
+    def save(self, *args, **kwargs):
+        if self.pk:  # Check if the object already exists (i.e., it's an update)
+            original = Booking.objects.get(pk=self.pk)
+            if original.approved != self.approved:
+                from booking.utils import send_booking_email
+                send_booking_email(self)
+        super().save(*args, **kwargs)

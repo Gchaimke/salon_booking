@@ -1,13 +1,14 @@
 import datetime
 import logging
-from math import e
 from django.urls import path, reverse
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpResponseRedirect
-from booking.models import Booking, BookingSettings, BookingService
+from booking.models import Booking, BookingAlertEmail, BookingAlertSMS, BookingSettings, BookingService
+from booking.utils import send_booking_email
 from gcalendar_sync.models import GCalendarSyncSettings
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,17 @@ class BookingAdmin(admin.ModelAdmin):
         updated = queryset.update(approved=True)
         self.message_user(
             request, f'{updated} booking(s) successfully approved.')
+        for booking in queryset:
+            send_booking_email(booking)
+
     approve_bookings.short_description = "Approve selected bookings"
 
     def reject_bookings(self, request, queryset):
         updated = queryset.update(approved=False)
         self.message_user(
             request, f'{updated} booking(s) successfully rejected.')
+        for booking in queryset:
+            send_booking_email(booking)
     reject_bookings.short_description = "Reject selected bookings"
 
     def sync_user_and_customer(self, request, queryset):
@@ -82,10 +88,12 @@ class BookingAdmin(admin.ModelAdmin):
         synced_count = 0
         skipped_count = 0
         reminders_overrides = []
-        sync_settings = GCalendarSyncSettings.objects.filter(enabled=True).last()
+        sync_settings = GCalendarSyncSettings.objects.filter(
+            enabled=True).last()
         if sync_settings and hasattr(sync_settings, 'reminders'):
             reminders = getattr(sync_settings, 'reminders').all() or []
-            reminders_overrides = [{'method': reminder.method, 'minutes': reminder.minutes_before} for reminder in reminders]
+            reminders_overrides = [
+                {'method': reminder.method, 'minutes': reminder.minutes_before} for reminder in reminders]
         for booking in queryset:
             if booking.approved:
                 event = GCalendarEvent.objects.filter(booking=booking).first()
@@ -101,7 +109,7 @@ class BookingAdmin(admin.ModelAdmin):
                             booking.date, booking.time),
                         end_time=event_end_time,
                         reminders_overrides=reminders_overrides
-                        )
+                    )
 
                     synced_count += 1
                 else:
@@ -130,14 +138,31 @@ admin.site.register(Booking, BookingAdmin)
 
 class BookingServicesInline(admin.StackedInline):
     model = BookingService
-    extra = 1
+    extra = 0
     verbose_name = 'Booking Service'
     verbose_name_plural = 'Booking Services'
     list_display = ['name', 'duration', 'price']
 
 
+class BookingAlertEmailInline(admin.StackedInline):
+    model = BookingAlertEmail
+    extra = 0
+    verbose_name = 'Booking Alert Email'
+    verbose_name_plural = 'Booking Alert Emails'
+
+
+class BookingAlertSMSInline(admin.StackedInline):
+    model = BookingAlertSMS
+    extra = 0
+    verbose_name = 'Booking Alert SMS'
+    verbose_name_plural = 'Booking Alert SMS'
+
+
 class BookingSettingsAdmin(admin.ModelAdmin):
-    inlines = [BookingServicesInline]
+    verbose_name = "Settings"
+    verbose_name_plural = "Setting"
+    inlines = [BookingAlertEmailInline,
+               BookingAlertSMSInline, BookingServicesInline]
 
 
 admin.site.register(BookingSettings, BookingSettingsAdmin)

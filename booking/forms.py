@@ -21,12 +21,9 @@ class ChangeInputsStyle(forms.Form):
             })
 
 
-class BookingServiceForm(ChangeInputsStyle):
+class BookingServiceAndDateForm(ChangeInputsStyle):
     service = forms.ModelChoiceField(
         queryset=BookingService.objects.all(), required=True)
-
-
-class BookingDateForm(ChangeInputsStyle):
     date = forms.DateField(required=True)
 
 

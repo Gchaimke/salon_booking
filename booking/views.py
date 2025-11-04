@@ -10,8 +10,8 @@ from django.views.generic import ListView, TemplateView, UpdateView
 from formtools.wizard.views import SessionWizardView
 from django.contrib.auth.models import User
 
-from booking.forms import (BookingCustomerForm, BookingDateForm, BookingServiceForm,
-                           BookingSettingsForm, BookingTimeForm)
+from booking.forms import (
+    BookingCustomerForm, BookingServiceAndDateForm, BookingSettingsForm, BookingTimeForm)
 from booking.models import Booking, BookingSettings, BookingService
 from booking.settings import (BOOKING_BG, BOOKING_DESC,
                               BOOKING_SUCCESS_REDIRECT_URL, BOOKING_TITLE,
@@ -81,8 +81,8 @@ def bookingUpdateView(request, id, type):
 # Booking Part
 # # # # # # # #
 BOOKING_STEP_FORMS = (
-    ('Service', BookingServiceForm),
-    ('Date', BookingDateForm),
+    # <input type="text" name="Date-date" class="form-control flatpickr-input active" required="" id="id_Date-date" readonly="readonly">
+    ('ServiceAndDate', BookingServiceAndDateForm),
     ('Time', BookingTimeForm),
     ('User Info', BookingCustomerForm)
 )
@@ -95,16 +95,11 @@ class BookingCreateWizardView(SessionWizardView):
     def get_context_data(self, form, **kwargs):
         context = super().get_context_data(form=form, **kwargs)
         progress_width = "0"
-        service_data = self.get_cleaned_data_for_step('Service')
-        if service_data and isinstance(service_data, dict) and 'service' in service_data:
-            service = name = service_data["service"]
-        if self.steps.current == 'Date':
-            progress_width = "25"
         if self.steps.current == 'Time':
-            date_data = self.get_cleaned_data_for_step('Date')
-            if date_data and isinstance(date_data, dict) and 'date' in date_data and service:
+            date_data = self.get_cleaned_data_for_step('ServiceAndDate')
+            if date_data and isinstance(date_data, dict) and 'date' in date_data and 'service' in date_data:
                 context["get_available_time"] = get_available_time(
-                    date_data["date"], service)
+                    date_data["date"], date_data["service"])
             progress_width = "50"
         if self.steps.current == 'User Info':
             progress_width = "75"
