@@ -8,3 +8,8 @@
         </a>
     </li>
 {% endblock %}
+
+{% block result_list %}
+{% include 'booking/admin/components/full_calendar.html' %}
+{{ block.super }}
+{% endblock %}

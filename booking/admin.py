@@ -42,6 +42,20 @@ class BookingAdmin(admin.ModelAdmin):
     if GCalendarEvent:
         actions.append('sync_with_calendar')
 
+
+    def changelist_view(self, request, extra_context=None):
+        response = super(BookingAdmin, self).changelist_view(request, extra_context)
+        filtered_query_set = response.context_data["cl"].queryset
+        bookings = []
+        for b in filtered_query_set:
+            bookings.append({
+                'user_name': b.user_name,
+                'start':f'{b.date}T{b.time}',
+                'end': f'{b.date}T{(datetime.datetime.combine(b.date, b.time) + datetime.timedelta(minutes=int(b.service.duration))).time()}',
+            })
+        # Call the parent's changelist_view to handle the rest
+        return super().changelist_view(request, extra_context={ 'bookings': bookings})
+
     def approve_bookings(self, request, queryset):
         updated = queryset.update(approved=True)
         self.message_user(
