@@ -45,6 +45,8 @@ class BookingAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         response = super(BookingAdmin, self).changelist_view(request, extra_context)
+        if isinstance(response, HttpResponseRedirect) or not hasattr(response, 'context_data'):
+            return super().changelist_view(request)
         filtered_query_set = response.context_data["cl"].queryset
         bookings = []
         for b in filtered_query_set:
